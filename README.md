@@ -4,4 +4,4 @@ Key features include drag-and-drop control; text formatting for complex nodes to
 
 Saves/Loads to/from JSON (may not be backwards compatible with future versions). Also output to PNG.
 
-Free for non-commercial use.
+Free to use, distribute, modify etc.
