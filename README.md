@@ -2,6 +2,6 @@ This is a tree-drawing app that runs locally on the browser in one single file. 
 
 Key features include drag-and-drop control; text formatting for complex nodes to model features and checking; movement arrows with adjustable curvatures.
 
-Saves/Loads to/from JSON (may not be backwards compatible with future versions). Also output to PNG.
+Saves/Loads to/from JSON (may not be backwards compatible with future versions) plus output to PNG. From v1.1 onwards, includes output to LaTeX/forest code.
 
 Free to use, distribute, modify etc.
