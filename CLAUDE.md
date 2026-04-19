@@ -2,9 +2,11 @@
 
 ## Project Overview
 
-Single-file browser application for drawing syntactic trees. No build system, no dependencies, no server. Everything lives in one `.html` file. Read the current source (`jsSynTree_v1_3.html`) before starting any session.
+Single-file browser application for drawing syntactic trees. No build system, no dependencies, no server. Everything lives in one `.html` file. Read the current source before starting any session.
 
 Full feature specifications are in `jsSynTree_v2_design.md`. Refer to it for detailed implementation instructions for every session below.
+
+The canonical bracket notation format is specified in `jsSynTree_bracket_spec.md`. Any session that touches bracket import or export must implement the full spec.
 
 ---
 
@@ -28,15 +30,33 @@ See design doc **Session 1** for full specification.
 
 ---
 
-### ✅ Session 2 — Navigation Panel → `jsSynTree_v1_5.html`
+### ✅ Session 2 — Bracket Format + Navigation Panel → `jsSynTree_v1_5.html`
 See design doc **Session 2** for full specification.
-- [ ] Restructure layout into a flex row `.workspace` containing the canvas and a `.nav-panel`
-- [ ] Implement `BracketViewModule`: generates bracket string + span map from current tree state; strips formatting markup for display; annotates circle/box styles; lists disconnected nodes and movement arrows as comments
-- [ ] Render bracket string as `<span>` elements (one per node) to allow per-node highlighting
-- [ ] Sync highlighting: canvas selection → highlight corresponding span; scroll into view
-- [ ] Sync selection: clicking a span in the nav panel → select that node on canvas and redraw
-- [ ] Hide/show toggle button for the panel
-- [ ] Hook `navPanel.update()` into end of `redraw()`
+
+**Part A — Bracket format upgrade (import + export)**
+- [x] Upgrade `BracketParser.parse` to handle `|style` suffix (`box`, `circle`), `{features}` block (`;`-separated), `\n` escapes in labels, and `_id` suffixes (strip from display label, preserve as node ID hint)
+- [x] Implement escaped characters: `\|` (literal pipe in label), `\;` (literal semicolon in feature), `\n` (newline in label)
+- [x] Pass parsed style and features through `BracketParser.toAppData` so they are set on the resulting node objects
+- [x] Implement `BracketExporter` module with `export(nodes, connections, movementArrows)` function:
+  - Finds root nodes, recurses depth-first
+  - Emits multi-line format when depth > 2 or more than 4 total nodes; single-line otherwise
+  - Appends `|style` if non-default, `{features}` if non-empty, `_id` if node is referenced by a movement arrow
+  - Escapes `|` and `;` in label/feature content
+  - Encodes multiline labels with `\n`
+  - Prepends comment: `% geometry, movement arrows, and decorations are not represented`
+  - Appends disconnected nodes under `% disconnected:` comment
+- [x] Add "Export Bracket" button to toolbar that calls `BracketExporter.export` and copies result to clipboard
+- [x] Update the bracket import modal examples to show `|style` and `{features}` syntax
+- [x] Update the formatting help text in the bracket import modal to reference the spec
+
+**Part B — Navigation Panel**
+- [x] Restructure layout into a flex row `.workspace` containing the canvas and a `.nav-panel`
+- [x] Implement `BracketViewModule`: wraps `BracketExporter.export` to generate the bracket string; additionally returns a **span map** — array of `{ nodeId, start, end }` objects recording each node's character span in the output string
+- [x] Render bracket string in the nav panel as `<span>` elements (one per node span) to allow per-node highlighting; plain text in between as text nodes
+- [x] Sync highlighting: canvas selection → highlight corresponding `<span>`; scroll into view
+- [x] Sync selection: clicking a `<span>` in the nav panel → select that node on canvas and redraw
+- [x] Hide/show toggle button for the panel (`«` / `»`)
+- [x] Hook `navPanel.update()` into end of `redraw()`
 
 ---
 
@@ -104,6 +124,7 @@ See design doc **Session 8** for full specification.
 - [ ] Include decorations in SVG export (`<rect>` elements) and PNG export
 - [ ] Omit decorations from LaTeX export; add comment line noting the omission
 - [ ] Keep decoration selection logic strictly separate from node selection logic
+- [ ] Update `BracketExporter` to include decoration-referenced node IDs in `_id` suffixes (now that decorations exist)
 
 ---
 
@@ -111,9 +132,7 @@ See design doc **Session 8** for full specification.
 
 | File | Version | Status |
 |------|---------|--------|
-| `jsSynTree_v1_3.html` | v1.3 | Current working base |
-| `jsSynTree_v2_design.md` | — | Full feature specification |
-| `CLAUDE.md` | — | This file |
+| `jsSynTree_v1_3.html` | v1.3 | Previous working base |
 | `jsSynTree_v1_4.html` | v1.4 | Session 1 output |
 | `jsSynTree_v1_5.html` | v1.5 | Session 2 output |
 | `jsSynTree_v1_6.html` | v1.6 | Session 3 output |
@@ -122,3 +141,6 @@ See design doc **Session 8** for full specification.
 | `jsSynTree_v1_9.html` | v1.9 | Session 6 output |
 | `jsSynTree_v2_0.html` | v2.0 | Session 7 output |
 | `jsSynTree_v2_1.html` | v2.1 | Session 8 output |
+| `jsSynTree_v2_design.md` | — | Full feature specification |
+| `jsSynTree_bracket_spec.md` | — | Bracket notation format specification |
+| `CLAUDE.md` | — | This file |
