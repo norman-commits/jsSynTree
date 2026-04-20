@@ -93,11 +93,11 @@ See design doc **Session 5** for full specification.
 
 ### ✅ Session 6 — Feature Matrix Bracket Styles → `jsSynTree_v1_9.html`
 See design doc **Session 6** for full specification.
-- [ ] Extract bracket drawing into standalone `drawFeatureBrackets(ctx, cx, y, bw, bh, style)` function
-- [ ] Implement three styles: `'rounded'` (current default), `'angular'`, `'serif'`
-- [ ] Store selection in `this.featureBracketStyle`; persist to `localStorage`
-- [ ] Add style selector to Settings modal
-- [ ] Update SVG export to honour bracket style
+- [x] Extract bracket drawing into standalone `drawFeatureBrackets(ctx, cx, y, bw, bh, style)` function
+- [x] Implement three styles: `'rounded'` (current default), `'angular'`, `'serif'`
+- [x] Store selection in `this.featureBracketStyle`; persist to `localStorage`
+- [x] Add style selector to Settings modal
+- [x] Update SVG export to honour bracket style
 
 ---
 
