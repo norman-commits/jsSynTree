@@ -62,11 +62,11 @@ See design doc **Session 2** for full specification.
 
 ### ✅ Session 3 — Copy and Paste → `jsSynTree_v1_6.html`
 See design doc **Session 3** for full specification.
-- [ ] Implement internal clipboard (`this.clipboard`) — not system clipboard
-- [ ] `Ctrl+C`: copy selected node or dominance-selected subtree (nodes + internal connections + internal movement arrows only)
-- [ ] `Ctrl+V`: paste with new IDs, offset coordinates (+40px), select pasted nodes as dominance group, save state
-- [ ] `Ctrl+X`: copy then delete
-- [ ] No-op gracefully when clipboard is empty
+- [x] Implement internal clipboard (`this.clipboard`) — not system clipboard
+- [x] `Ctrl+C`: copy selected node or dominance-selected subtree (nodes + internal connections + internal movement arrows only)
+- [x] `Ctrl+V`: paste with new IDs, offset coordinates (+40px), select pasted nodes as dominance group, save state
+- [x] `Ctrl+X`: copy then delete
+- [x] No-op gracefully when clipboard is empty
 
 ---
 
