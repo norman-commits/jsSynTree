@@ -72,11 +72,11 @@ See design doc **Session 3** for full specification.
 
 ### ✅ Session 4 — Configurable Keyboard Shortcuts → `jsSynTree_v1_7.html`
 See design doc **Session 4** for full specification.
-- [ ] Implement `ShortcutManager` module with action-name-keyed defaults
-- [ ] Refactor `handleKeyDown` to delegate to `ShortcutManager.match(event)`
-- [ ] Persist shortcut overrides to `localStorage` under `jsSynTree_shortcuts`
-- [ ] Settings modal: shortcut table with Record and Reset buttons per row; Reset All button; conflict highlighting
-- [ ] Add "Settings" button to toolbar
+- [x] Implement `ShortcutManager` module with action-name-keyed defaults
+- [x] Refactor `handleKeyDown` to delegate to `ShortcutManager.match(event)`
+- [x] Persist shortcut overrides to `localStorage` under `jsSynTree_shortcuts`
+- [x] Settings modal: shortcut table with Record and Reset buttons per row; Reset All button; conflict highlighting
+- [x] Add "Settings" button to toolbar
 
 ---
 
