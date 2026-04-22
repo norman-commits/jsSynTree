@@ -2,27 +2,7 @@
 
 A single-file, browser-based syntactic-tree drawing tool aimed at generative-syntax frameworks. Drag-and-drop interface, no bracketed-string entry required (though bracket import and export are supported). Runs locally — open the HTML file in any modern browser; no server, no build step, no external dependencies.
 
-Free to use, distribute, and modify.
-
----
-
-## What's new in v2.1
-
-v2.1 closes out the eight-session roadmap defined in `jsSynTree_v2_design.md`. Compared with v1.3, this release adds:
-
-- **Box decorations** with stroke/fill controls, corner radius, and movable corner labels
-- **Bracket-notation export** plus a live nav-panel view of the tree as bracket notation
-- **Configurable keyboard shortcuts** with conflict highlighting, persisted to `localStorage`
-- **Custom font selection**, including loading `.ttf`/`.otf`/`.woff`/`.woff2` from disk
-- **Three feature-matrix bracket styles**: rounded, angular, and serif/linguistic
-- **Per-arrow customisation**: line style (dashed/dotted/solid), shape (curved/angular), and a draggable text annotation
-- **Copy / cut / paste** of single nodes or whole subtrees
-- **Bug fixes** — see "Bug fixes since v1.3" below
-
-The bracket-notation grammar is specified in full in `jsSynTree_bracket_spec.md`.
-
----
-
+Free to use, distribute, and modify for non-commercial use.
 ## Quick start
 
 1. Open `jsSynTree_v2_1.html` in a browser.
@@ -117,7 +97,192 @@ A multi-line node label uses the literal two-character sequence `\n`:
 ```
 [**DP**\n*i*|circle {uφ; EPP}]
 ```
+# Bracketing syntax
 
+## Scope
+
+This spec covers what can be expressed in bracket notation for round-trip import/export: tree topology, inline text formatting, node style (circle/box), and syntactic feature matrices. Geometry (node coordinates, arrow curvature) is not captured — the layout engine regenerates it on import, same as the existing bracket import modal. Movement arrows and box decorations are excluded.
+
+---
+
+## Base structure
+
+Standard labelled bracket notation. Either bracket type is accepted on import; `[` is canonical on export.
+
+```
+[TP [NP [D the] [N cat]] [T' [T] [VP [V] [NP]]]]
+```
+
+Multi-line (recommended for any tree with more than two levels):
+
+```
+[TP
+  [NP
+    [D the]
+    [N cat]
+  ]
+  [T'
+    [T]
+    [VP [V] [NP]]
+  ]
+]
+```
+
+No new syntax here — this is identical to the existing bracket import.
+
+---
+
+## Node style
+
+Appended after the label with a `|` delimiter. Two valid values: `box`, `circle`. Omitted for the default (no enclosure).
+
+```
+[NP|circle [D the] [N cat]]
+[T|box]
+[TP [NP|circle] [T']]
+```
+
+The `|` is placed immediately after the label text, before any whitespace that introduces children. Style applies to the enclosing shape of the node label only, not to its children.
+
+### Why `|`
+
+Colon (`:`) appears in semantic type notation (`e:t`, `〈e,t〉`). Angle brackets (`<>`) are used for feature bundles in some frameworks and also clash with HTML. Period (`.`) appears in index notation (`NP.i`). Pipe is rare in syntactic labels and unambiguous here.
+
+---
+
+## Feature matrix
+
+Enclosed in `{}` immediately after the label (and after `|style` if present). Features are separated by `;`. Each feature string can contain inline formatting.
+
+```
+[NP {~~EPP~~; uD; +past}]
+[NP|circle {~~EPP~~; uD; +past}]
+[T {~~EPP~~; *strong*}|box]
+```
+
+Order of components within a node: `[Label|style {features} children]`
+
+The `{...}` block is unambiguous because curly braces have no role in standard bracket notation for syntax trees. No escaping is needed for any character likely to appear in a feature specification.
+
+### Multi-feature formatting
+
+Each feature is one string (matching how jsSynTree stores them — one per line in the feature textarea). Semicolon is the separator because comma appears in some feature value notation (e.g. `[+N, −V]` in GB) and would require quoting. Semicolons are not standard feature separators in any major framework and are therefore safe.
+
+If a feature itself contains a semicolon (unusual but possible), escape it as `\;`.
+
+---
+
+## Inline text formatting
+
+Applied inside the label string and inside individual feature strings. Full proposed syntax:
+
+| Markup | Output | Notes |
+|---|---|---|
+| `**text**` | bold | Unchanged |
+| `*text*` | italic | Unchanged |
+| `~text~` | strikethrough | Unchanged |
+| `^text^` | superscript | Unchanged |
+| `_text_` | subscript | Unchanged — no clash inside a fenced code block |
+| `[SIZE=14]text[/SIZE]` | font size | BBCode; no Markdown equivalent, irrelevant inside fence |
+
+These apply identically in node labels and in feature strings.
+
+### Multiline node labels
+
+Literal newlines within a label are expressed with `\n`:
+
+```
+[**DP**\n*i*|circle {uφ; EPP}]
+```
+
+This prevents ambiguity between a newline that is part of the label and whitespace that introduces a child node in the indented multi-line format.
+
+---
+
+## Complete example
+
+```
+[TP_A
+  [NP_B|circle {~~EPP~~; uφ; +nom}
+    [**the**]
+    [*cat*]
+  ]
+  [T'
+    [T|box {~~EPP~~}]
+    [VP
+      [v*]
+      [VP
+        [V saw]
+        [NP|box {uφ; +acc}
+          [**every**]
+          [N dog]
+        ]
+      ]
+    ]
+  ]
+]
+```
+
+The `_A`, `_B` suffixes are node IDs for reference by the overlay layer (movement arrows, box decorations). They are stripped from the display label. Nodes without an overlay reference do not need an ID.
+
+---
+## Grammar (informal)
+
+```
+tree     ::= node
+node     ::= '[' label style? features? children* ']'
+label    ::= formatted-text ('\n' formatted-text)* ('_' id)?
+style    ::= '|' ('box' | 'circle')
+features ::= '{' feature (';' feature)* '}'
+feature  ::= formatted-text
+children ::= whitespace node
+id       ::= [A-Za-z0-9]+
+```
+
+`formatted-text` is the inline formatting markup defined above. Whitespace between components within a node is insignificant. Whitespace between `]` and the next `[` (siblings) is insignificant.
+
+---
+
+## Edge cases and escaping
+
+| Input              | Treatment                                                             |                                             |
+| ------------------ | --------------------------------------------------------------------- | ------------------------------------------- |
+| `[v*]`             | Label is `v*`; lone `*` is not italic markup (requires matching pair) |                                             |
+| `[T']`             | Label is `T'`; apostrophe is literal                                  |                                             |
+| `[Ā]`              | Unicode label, fine                                                   |                                             |
+| `[NP\|circle]`     | Escaped pipe in label (literal `                                      | `); use `\|`                                |
+| `[NP {a\;b}]`      | Escaped semicolon in feature value                                    |                                             |
+| `[NP {a ~~b~~ c}]` | Strikethrough inside a feature, fine                                  |                                             |
+| `[NP {}]`          | Empty feature block — equivalent to no features                       |                                             |
+| `[NP               | ]`                                                                    | Empty style — treated as no style (default) |
+| `[[DP]]`           | Not valid; inner `[` starts a child node, label is empty              |                                             |
+
+---
+
+## Export behaviour
+
+The export function should:
+
+1. Find root nodes (nodes with no incoming connections)
+2. Recurse through the connection graph depth-first
+3. Emit multi-line format for any tree with depth > 2 or more than 4 total nodes
+4. Emit single-line format otherwise
+5. Include node IDs only if the node is referenced by at least one movement arrow or decoration (for future overlay compatibility)
+6. Omit `|` if style is default; omit `{}` if features array is empty
+7. Add a comment line at the top noting what is not captured: `% geometry, movement arrows, and decorations are not represented`
+
+Disconnected nodes (no incoming or outgoing connections) are appended after the main tree with a `% disconnected:` comment, one bracket per line.
+### What this notation does not capture
+
+| Element                        | Status                                   |
+| ------------------------------ | ---------------------------------------- |
+| Node x/y coordinates           | ❌ Regenerated by layout engine on import |
+| Movement arrow topology        | ❌ Overlay layer (future spec)            |
+| Movement arrow style/curvature | ❌ Overlay layer                          |
+| Box decorations                | ❌ Overlay layer                          |
+| Canvas dimensions              | ❌ Not expressed                          |
+
+This means the format is **topology-faithful but geometry-lossy**. A round-trip through export → import produces the same tree structure with the same labels, styles, and features, but nodes will be repositioned by the layout algorithm. This is the same trade-off already made by the existing bracket import modal.
 ### What bracket export does and doesn't capture
 
 Bracket notation captures topology, labels, styles, and features faithfully. It does **not** capture node coordinates, movement-arrow geometry/style, or box decorations. Round-tripping a tree through export then import yields the same structure but the layout engine repositions every node from scratch (this is the same trade-off the import dialog has always made). The exporter prepends a comment line saying so.
@@ -192,7 +357,6 @@ Defaults:
 | Delete selected | Delete (or Backspace) |
 | Cancel / deselect | Escape |
 | Save node properties (in modal) | Ctrl+Enter |
-
 All shortcuts are remappable in Settings. Click "Record" next to any binding and press the key combination you want; "Reset" restores that binding to its default; "Reset All" wipes all overrides. Conflicts (two actions bound to the same combination) are highlighted in amber but not blocked. Overrides persist to `localStorage` under `jsSynTree_shortcuts`.
 
 ---
@@ -213,46 +377,6 @@ Tree files are JSON with a `version` field (currently `"2.1"`). The shape:
 ```
 
 Files saved in v1.3 still load — missing fields fall back to safe defaults.
-
----
-
-## Browser requirements
-
-Anything modern: Chrome, Firefox, Safari, or Edge from roughly 2021 onwards. The code uses `FontFace`, `navigator.clipboard.writeText`, `requestAnimationFrame`, `Set`, `Object.assign`, and template literals. There is one optional use of `CanvasRenderingContext2D.roundRect`, gracefully falling back to `fillRect` on older engines.
-
----
-
-## Bug fixes since v1.3
-
-- **v1.4** — Removed the broken `[SC]` small-caps markup (canvas can't render `font-variant: small-caps`). Fixed circle-styled nodes having branch lines that intersected the circle instead of meeting its edge.
-- **v1.5** — Bracket parser upgraded to handle `|style`, `{features}`, multi-line labels, and `_id` suffixes. Bracket exporter and live nav-panel added.
-- **v1.6** — Internal copy/cut/paste added.
-- **v1.7** — Configurable keyboard shortcuts.
-- **v1.8** — Custom fonts.
-- **v1.9** — Three feature-matrix bracket styles.
-- **v2.0** — Per-arrow line style, line shape, and draggable annotation.
-- **v2.1** — Box decorations.
-
-### Additional fixes in this v2.1 build
-
-- **Nav panel toggle no longer becomes unreachable when collapsed.** The collapsed panel previously had `opacity: 0; pointer-events: none`, hiding the toggle button along with the content. The collapsed state now keeps a thin header strip (32 px) visible so the toggle stays clickable.
-- **Bracket exporter now correctly emits a `% disconnected:` section** for truly isolated nodes (no parent, no children). The previous filter contained a logical contradiction — it required `!parentMap[n.id] && !roots.includes(n)`, but isolated nodes were already in `roots`, so the disconnected section never appeared.
-- **Copy/paste now preserves arrow customisations.** `lineStyle`, `lineShape`, `annotation`, `annotationPosition`, and `annotationOffset` were previously dropped during copy and silently re-defaulted on paste.
-- **`setMode` no longer has dead-code box cancellation.** The cancellation block was guarded by `if (this.mode !== newMode)` placed *after* the assignment, so it was always false. Mouseup recovery covered for it in practice, but the intent is now correctly expressed.
-- **SVG-export formatting check no longer references the removed `[SC]` marker.**
-- **Bracket exporter feature separator is now `; ` (with space)** rather than just `;`, matching the spec examples and improving readability.
-- **`scrollIntoView` call in the nav panel is now defensively guarded**, making the code portable to environments where that DOM method is missing (e.g. some test harnesses).
-
----
-
-## Files
-
-| File | Purpose |
-|---|---|
-| `jsSynTree_v2_1.html` | The whole application, single-file. Open this. |
-| `jsSynTree_v2_design.md` | Design document tracking the eight-session roadmap. |
-| `jsSynTree_bracket_spec.md` | Full bracket-notation grammar specification. |
-| `readme.md` | This file. |
 
 ---
 
