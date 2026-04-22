@@ -82,12 +82,12 @@ See design doc **Session 4** for full specification.
 
 ### ✅ Session 5 — Custom Fonts → `jsSynTree_v1_8.html`
 See design doc **Session 5** for full specification.
-- [ ] Add font selector dropdown (curated safe-web-font list) to toolbar or Settings modal
-- [ ] Store selected font in `this.currentFont`; replace all hardcoded `'Arial'` references
-- [ ] "Load Font..." file picker: reads `.ttf/.otf/.woff/.woff2`, creates `FontFace`, adds to `document.fonts`, adds to dropdown
-- [ ] Warn user that loaded fonts do not persist across sessions
-- [ ] Apply font to nav panel display
-- [ ] Update SVG export to use current font
+- [x] Add font selector dropdown (curated safe-web-font list) to toolbar or Settings modal
+- [x] Store selected font in `this.currentFont`; replace all hardcoded `'Arial'` references
+- [x] "Load Font..." file picker: reads `.ttf/.otf/.woff/.woff2`, creates `FontFace`, adds to `document.fonts`, adds to dropdown
+- [x] Warn user that loaded fonts do not persist across sessions
+- [x] Apply font to nav panel display
+- [x] Update SVG export to use current font
 
 ---
 

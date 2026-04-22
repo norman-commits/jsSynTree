@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>jsSynTree 1.7</title>
+    <title>jsSynTree 1.9</title>
     <style>
         body {
             margin: 0;
@@ -440,7 +440,29 @@
 
     <div id="settingsModal" class="modal">
         <div class="modal-content" style="max-width:600px;">
-            <h3>Keyboard Shortcuts</h3>
+            <h3>Settings</h3>
+            <div style="margin-bottom:15px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <label for="fontSelect" style="font-weight:bold;">Font:</label>
+                <select id="fontSelect" style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;">
+                    <option value="Arial">Arial</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Courier New">Courier New</option>
+                    <option value="Palatino">Palatino</option>
+                    <option value="Helvetica">Helvetica</option>
+                </select>
+                <button id="loadFontBtn" style="padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid #ccc;background:white;">Load Font...</button>
+                <input type="file" id="loadFontInput" accept=".ttf,.otf,.woff,.woff2" style="display:none;">
+            </div>
+            <div style="margin-bottom:15px;display:flex;align-items:center;gap:10px;">
+                <label for="featureBracketStyleSelect" style="font-weight:bold;">Feature Bracket Style:</label>
+                <select id="featureBracketStyleSelect" style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;">
+                    <option value="rounded">Rounded</option>
+                    <option value="angular">Angular</option>
+                    <option value="serif">Serif / Linguistic</option>
+                </select>
+            </div>
+            <h4 style="margin:0 0 10px 0;">Keyboard Shortcuts</h4>
             <table id="shortcutTable" style="width:100%;border-collapse:collapse;font-size:13px;">
                 <thead>
                     <tr style="border-bottom:2px solid #ddd;text-align:left;">
@@ -757,7 +779,53 @@
 
             return { Manager };
         })();
-        
+
+        // FEATURE BRACKET DRAWING
+        function drawFeatureBrackets(ctx, cx, y, bw, bh, style) {
+            const lx = cx - bw / 2;
+            const rx = cx + bw / 2;
+            const by = y + bh;
+
+            ctx.strokeStyle = '#666';
+
+            switch (style) {
+                case 'angular':
+                    ctx.lineWidth = 2.5;
+                    ctx.beginPath();
+                    ctx.moveTo(lx, y); ctx.lineTo(lx, by);
+                    ctx.moveTo(lx, y); ctx.lineTo(lx + 6, y);
+                    ctx.moveTo(lx, by); ctx.lineTo(lx + 6, by);
+                    ctx.moveTo(rx, y); ctx.lineTo(rx, by);
+                    ctx.moveTo(rx, y); ctx.lineTo(rx - 6, y);
+                    ctx.moveTo(rx, by); ctx.lineTo(rx - 6, by);
+                    ctx.stroke();
+                    break;
+                case 'serif':
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(lx, y); ctx.lineTo(lx, by);
+                    ctx.moveTo(lx, y); ctx.lineTo(lx + 10, y);
+                    ctx.moveTo(lx, by); ctx.lineTo(lx + 10, by);
+                    ctx.moveTo(rx, y); ctx.lineTo(rx, by);
+                    ctx.moveTo(rx, y); ctx.lineTo(rx - 10, y);
+                    ctx.moveTo(rx, by); ctx.lineTo(rx - 10, by);
+                    ctx.stroke();
+                    break;
+                case 'rounded':
+                default:
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(lx, y); ctx.lineTo(lx + 5, y);
+                    ctx.moveTo(lx, y); ctx.lineTo(lx, by);
+                    ctx.moveTo(lx, by); ctx.lineTo(lx + 5, by);
+                    ctx.moveTo(rx, y); ctx.lineTo(rx - 5, y);
+                    ctx.moveTo(rx, y); ctx.lineTo(rx, by);
+                    ctx.moveTo(rx, by); ctx.lineTo(rx - 5, by);
+                    ctx.stroke();
+                    break;
+            }
+        }
+
         // NODE HANDLER
         const NodeModule = (() => {
             class Node {
@@ -768,6 +836,7 @@
                     this.features = [];
                     this.id = Date.now() + Math.random().toString(36).substring(2, 9);
                     this.style = 'none';
+                    this.font = 'Arial';
                     
                     // Cache for bounds calculation
                     this._boundsCache = null;
@@ -785,7 +854,7 @@
                     } else if (styles.subscript || styles.superscript) {
                         currentSize = Math.round(baseSize * 0.75);
                     }
-                    fontString += `${currentSize}px Arial`;
+                    fontString += `${currentSize}px ${this.font}`;
                     return fontString;
                 }
 
@@ -811,7 +880,7 @@
                     if (!formattedText.includes('*') && !formattedText.includes('~') &&
                         !formattedText.includes('^') && !formattedText.includes('_') &&
                         !formattedText.includes('[SIZE=')) {
-                        ctx.font = `${baseSize}px Arial`;
+                        ctx.font = `${baseSize}px ${this.font}`;
                         const metrics = ctx.measureText(formattedText);
                         return { width: metrics.width, height: baseSize };
                     }
@@ -908,7 +977,7 @@
                 
                 getBounds(ctx) {
                     const featuresStr = this.features.join('|');
-                    const hash = `${this.x},${this.y},${this.text},${featuresStr},${this.style}`;
+                    const hash = `${this.x},${this.y},${this.text},${featuresStr},${this.style},${this.font}`;
                     if (this._boundsHash !== hash || !this._boundsCache) {
                         this._boundsCache = this._calculateBounds(ctx);
                         this._boundsHash = hash;
@@ -969,7 +1038,7 @@
                         !formattedText.includes('^') && !formattedText.includes('_') &&
                         !formattedText.includes('[SIZE=')) {
                         
-                        let font = `${baseSize}px Arial`;
+                        let font = `${baseSize}px ${this.font}`;
                         if (isSelected) {
                             font = "bold " + font;
                         }
@@ -1028,7 +1097,7 @@
                     });
                 }
 
-                draw(ctx, isSelected, isDominanceSelected = false) {
+                draw(ctx, isSelected, isDominanceSelected = false, bracketStyle = 'rounded') {
                     const lines = this.text.split('\n');
                     const padding = CONFIG.NODE_PADDING;
                     const nodeHeight = lines.length * CONFIG.LINE_HEIGHT + padding;
@@ -1092,24 +1161,8 @@
                         
                         const bracketWidth = Math.max(currentFeatureMaxWidth + 10, 40);
                         const bracketHeight = this.features.length * CONFIG.FEATURE_LINE_HEIGHT + 5;
-                        
-                        // Draw brackets
-                        ctx.strokeStyle = '#666';
-                        ctx.lineWidth = 2;
-                        ctx.beginPath();
-                        ctx.moveTo(this.x - bracketWidth/2, featureY);
-                        ctx.lineTo(this.x - bracketWidth/2 + 5, featureY);
-                        ctx.moveTo(this.x - bracketWidth/2, featureY);
-                        ctx.lineTo(this.x - bracketWidth/2, featureY + bracketHeight);
-                        ctx.moveTo(this.x - bracketWidth/2, featureY + bracketHeight);
-                        ctx.lineTo(this.x - bracketWidth/2 + 5, featureY + bracketHeight);
-                        ctx.moveTo(this.x + bracketWidth/2, featureY);
-                        ctx.lineTo(this.x + bracketWidth/2 - 5, featureY);
-                        ctx.moveTo(this.x + bracketWidth/2, featureY);
-                        ctx.lineTo(this.x + bracketWidth/2, featureY + bracketHeight);
-                        ctx.moveTo(this.x + bracketWidth/2, featureY + bracketHeight);
-                        ctx.lineTo(this.x + bracketWidth/2 - 5, featureY + bracketHeight);
-                        ctx.stroke();
+
+                        drawFeatureBrackets(ctx, this.x, featureY, bracketWidth, bracketHeight, bracketStyle);
                         
                         // Draw feature text with formatting
                         ctx.fillStyle = '#333'; 
@@ -2085,15 +2138,16 @@
 
             // Convert one formatted-text string to an SVG <text> element
             // centred at (cx, cy).
-            function textToSVG(formattedText, baseSize, cx, cy, fill) {
+            function textToSVG(formattedText, baseSize, cx, cy, fill, fontFamily) {
                 fill = fill || '#333';
+                fontFamily = fontFamily || 'Arial';
                 if (!formattedText || formattedText.trim() === '') return '';
 
                 const hasFormatting = /\*|~|\^|_|\[SC\]|\[SIZE=/.test(formattedText);
 
                 if (!hasFormatting) {
                     return `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" ` +
-                           `font-family="Arial,sans-serif" font-size="${baseSize}" fill="${fill}">${svgEsc(formattedText)}</text>`;
+                           `font-family="${fontFamily},sans-serif" font-size="${baseSize}" fill="${fill}">${svgEsc(formattedText)}</text>`;
                 }
 
                 const segments = TextFormatter.parseFormattedText(formattedText);
@@ -2119,22 +2173,37 @@
                 });
 
                 return `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" ` +
-                       `font-family="Arial,sans-serif" font-size="${baseSize}" fill="${fill}">${tspans}</text>`;
+                       `font-family="${fontFamily},sans-serif" font-size="${baseSize}" fill="${fill}">${tspans}</text>`;
             }
 
             // Draw the square-bracket feature-matrix shape
-            function featureBrackets(cx, y, bw, bh) {
+            function featureBrackets(cx, y, bw, bh, style) {
                 const lx = cx - bw / 2;
                 const rx = cx + bw / 2;
                 const by = y + bh;
-                // Left bracket
-                let d = `M${lx+6},${y} L${lx},${y} L${lx},${by} L${lx+6},${by}`;
-                // Right bracket
-                d +=   ` M${rx-6},${y} L${rx},${y} L${rx},${by} L${rx-6},${by}`;
-                return `<path d="${d}" fill="none" stroke="#666" stroke-width="2"/>`;
+                let sw, d;
+                switch (style) {
+                    case 'angular':
+                        sw = 2.5;
+                        d = `M${lx},${y} L${lx},${by} M${lx},${y} L${lx+6},${y} M${lx},${by} L${lx+6},${by}`;
+                        d += ` M${rx},${y} L${rx},${by} M${rx},${y} L${rx-6},${y} M${rx},${by} L${rx-6},${by}`;
+                        break;
+                    case 'serif':
+                        sw = 1.5;
+                        d = `M${lx},${y} L${lx},${by} M${lx},${y} L${lx+10},${y} M${lx},${by} L${lx+10},${by}`;
+                        d += ` M${rx},${y} L${rx},${by} M${rx},${y} L${rx-10},${y} M${rx},${by} L${rx-10},${by}`;
+                        break;
+                    case 'rounded':
+                    default:
+                        sw = 2;
+                        d = `M${lx+5},${y} L${lx},${y} L${lx},${by} L${lx+5},${by}`;
+                        d += ` M${rx-5},${y} L${rx},${y} L${rx},${by} L${rx-5},${by}`;
+                        break;
+                }
+                return `<path d="${d}" fill="none" stroke="#666" stroke-width="${sw}"/>`;
             }
 
-            function generate(nodes, connections, movementArrows, canvasWidth, canvasHeight, ctx) {
+            function generate(nodes, connections, movementArrows, canvasWidth, canvasHeight, ctx, fontFamily, featureBracketStyle) {
                 const pad = 20;
 
                 let out = [];
@@ -2193,7 +2262,7 @@
                     // Text lines
                     lines.forEach((line, i) => {
                         const ty = node.y + np / 2 + (i + 0.5) * CONFIG.LINE_HEIGHT;
-                        out.push(textToSVG(line, 16, node.x, ty));
+                        out.push(textToSVG(line, 16, node.x, ty, '#333', fontFamily));
                     });
 
                     // Feature matrix
@@ -2207,11 +2276,11 @@
                         const bw = Math.max(maxFW + CONFIG.BRACKET_PADDING, CONFIG.BRACKET_MIN_WIDTH);
                         const bh = node.features.length * CONFIG.FEATURE_LINE_HEIGHT + 5;
 
-                        out.push(featureBrackets(node.x, fy, bw, bh));
+                        out.push(featureBrackets(node.x, fy, bw, bh, featureBracketStyle || 'rounded'));
 
                         node.features.forEach((feat, i) => {
                             const fty = fy + 5 + (i * CONFIG.FEATURE_LINE_HEIGHT) + CONFIG.FEATURE_LINE_HEIGHT / 2 - 2;
-                            out.push(textToSVG(feat, 14, node.x, fty));
+                                out.push(textToSVG(feat, 14, node.x, fty, '#333', fontFamily));
                         });
                     }
                 });
@@ -2387,6 +2456,10 @@
                 // Clipboard (internal, not system clipboard)
                 this.clipboard = null;
                 this._pasteOffset = 0;
+
+                // Feature bracket style
+                this.featureBracketStyle = localStorage.getItem('jsSynTree_featureBracketStyle') || 'rounded';
+                this.currentFont = localStorage.getItem('jsSynTree_font') || 'Arial';
 
                 // Settings
                 this.showGrid = true;
@@ -2574,7 +2647,7 @@
             // STATE MANAGEMENT METHODS            
             getCurrentStateObject() {
                 return {
-                    version: '1.7',
+                    version: '1.9',
                     nodes: this.nodes.map(node => ({
                         x: node.x,
                         y: node.y,
@@ -2756,6 +2829,45 @@
                 document.getElementById('resetAllShortcutsBtn').addEventListener('click', () => {
                     shortcutManager.resetAll();
                     this._buildSettingsTable();
+                });
+                document.getElementById('featureBracketStyleSelect').addEventListener('change', (e) => {
+                    this.featureBracketStyle = e.target.value;
+                    localStorage.setItem('jsSynTree_featureBracketStyle', this.featureBracketStyle);
+                    this.redraw();
+                });
+                document.getElementById('fontSelect').addEventListener('change', (e) => {
+                    this.currentFont = e.target.value;
+                    localStorage.setItem('jsSynTree_font', this.currentFont);
+                    this.redraw();
+                });
+                document.getElementById('loadFontBtn').addEventListener('click', () => {
+                    document.getElementById('loadFontInput').click();
+                });
+                document.getElementById('loadFontInput').addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        const fontName = file.name.replace(/\.(ttf|otf|woff|woff2)$/i, '');
+                        const fontFace = new FontFace(fontName, evt.target.result);
+                        fontFace.load().then((loaded) => {
+                            document.fonts.add(loaded);
+                            const select = document.getElementById('fontSelect');
+                            const opt = document.createElement('option');
+                            opt.value = fontName;
+                            opt.textContent = fontName + ' (loaded)';
+                            select.appendChild(opt);
+                            select.value = fontName;
+                            this.currentFont = fontName;
+                            localStorage.setItem('jsSynTree_font', this.currentFont);
+                            this.redraw();
+                            alert('Font "' + fontName + '" loaded.\n\nNote: loaded fonts do not persist across sessions.');
+                        }).catch((err) => {
+                            alert('Failed to load font: ' + err.message);
+                        });
+                    };
+                    reader.readAsArrayBuffer(file);
+                    e.target.value = '';
                 });
 
                 // Grid checkbox
@@ -3347,7 +3459,8 @@
                 this.nodes.forEach(node => {
                     const isSelected = this.selectedNode === node;
                     const isDominanceSelected = this.dominanceSelectedNodes.has(node);
-                    node.draw(this.ctx, isSelected, isDominanceSelected);
+                    node.font = this.currentFont;
+                    node.draw(this.ctx, isSelected, isDominanceSelected, this.featureBracketStyle);
                 });
 
                 // Update navigation panel
@@ -3356,6 +3469,8 @@
                         this.nodes, this.connections, this.movementArrows,
                         this.selectedNode ? this.selectedNode.id : null
                     );
+                    const navContent = document.getElementById('navPanelContent');
+                    if (navContent) navContent.style.fontFamily = this.currentFont;
                 }
             }
             
@@ -3381,7 +3496,10 @@
                 
                 this.connections.forEach(conn => conn.draw(this.ctx, false));
                 this.movementArrows.forEach(arrow => arrow.draw(this.ctx, false));
-                this.nodes.forEach(node => node.draw(this.ctx, false));
+                this.nodes.forEach(node => {
+                    node.font = this.currentFont;
+                    node.draw(this.ctx, false, false, this.featureBracketStyle);
+                });
 
                 const link = document.createElement('a');
                 link.download = 'syntactic-tree.png';
@@ -3444,7 +3562,9 @@
                         this.movementArrows,
                         this.canvasWidth,
                         this.canvasHeight,
-                        this.ctx
+                        this.ctx,
+                        this.currentFont,
+                        this.featureBracketStyle
                     );
 
                     const blob = new Blob([svgStr], { type: 'image/svg+xml' });
@@ -3679,6 +3799,8 @@
             openSettingsModal() {
                 this._recordingAction = null;
                 this._buildSettingsTable();
+                document.getElementById('featureBracketStyleSelect').value = this.featureBracketStyle;
+                document.getElementById('fontSelect').value = this.currentFont;
                 document.getElementById('settingsModal').style.display = 'flex';
             }
 
