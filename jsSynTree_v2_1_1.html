@@ -221,11 +221,17 @@
             overflow: hidden;
         }
         .nav-panel.collapsed {
-            width: 0;
-            min-width: 0;
-            border-left: none;
-            opacity: 0;
-            pointer-events: none;
+            width: 32px;
+            min-width: 32px;
+        }
+        .nav-panel.collapsed .nav-panel-header {
+            justify-content: center;
+            padding: 6px 4px;
+            border-bottom: none;
+        }
+        .nav-panel.collapsed .nav-panel-header > span,
+        .nav-panel.collapsed .nav-panel-content {
+            display: none;
         }
         .nav-panel-header {
             display: flex;
@@ -2452,8 +2458,16 @@
                     parentMap[c.toId] = c.fromId;
                 });
 
-                // Root nodes: no parent
-                const roots = nodes.filter(n => !parentMap[n.id]);
+                // Root nodes: no parent AND have at least one child (proper trees)
+                // Isolated nodes (no parent AND no children) are handled separately
+                const realRoots = nodes.filter(n =>
+                    !parentMap[n.id] && childMap[n.id] && childMap[n.id].length > 0
+                );
+                const isolated = nodes.filter(n =>
+                    !parentMap[n.id] && (!childMap[n.id] || childMap[n.id].length === 0)
+                );
+                // For id assignment / depth calc, use realRoots + isolated as "all roots"
+                const roots = realRoots;
 
                 // Nodes needing _id suffix: referenced by movement arrows or decorations
                 const needsId = new Set();
@@ -2511,7 +2525,7 @@
                     // {features}
                     if (node.features && node.features.length > 0) {
                         if (node.style && node.style !== 'none') result += ' ';
-                        result += '{' + node.features.map(f => escapeFeature(f)).join(';') + '}';
+                        result += '{' + node.features.map(f => escapeFeature(f)).join('; ') + '}';
                     }
 
                     const spanEnd = result.length;
@@ -2550,25 +2564,19 @@
                     spans.forEach(s => { s.start += offset; s.end += offset; });
                 }
 
-                // Disconnected nodes (no parent and no children)
-                const disconnected = nodes.filter(n =>
-                    !parentMap[n.id] && (!childMap[n.id] || childMap[n.id].length === 0) && !roots.includes(n)
-                );
-                if (roots.length === 0) {
-                    // All nodes are disconnected
-                    disconnected.push(...nodes);
-                }
-                const uniqueDisconnected = [...new Set(disconnected)];
-                if (uniqueDisconnected.length > 0) {
-                    result += '\n% disconnected:\n';
-                    uniqueDisconnected.forEach(n => {
+                // Disconnected nodes: truly isolated (no parent, no children)
+                // These were excluded from the main tree output above.
+                if (isolated.length > 0) {
+                    if (result) result += '\n';
+                    result += '% disconnected:\n';
+                    isolated.forEach(n => {
                         const spanStart = result.length;
                         result += '[' + escapeLabel(n.text);
                         if (idMap[n.id]) result += '_' + idMap[n.id];
                         if (n.style && n.style !== 'none') result += '|' + n.style;
                         if (n.features && n.features.length > 0) {
                             if (n.style && n.style !== 'none') result += ' ';
-                            result += '{' + n.features.map(f => escapeFeature(f)).join(';') + '}';
+                            result += '{' + n.features.map(f => escapeFeature(f)).join('; ') + '}';
                         }
                         result += ']';
                         const spanEnd = result.length;
@@ -2659,7 +2667,7 @@
 
                     // Scroll highlighted span into view
                     const highlighted = state.contentEl.querySelector('.nav-highlight');
-                    if (highlighted) {
+                    if (highlighted && typeof highlighted.scrollIntoView === 'function') {
                         highlighted.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                     }
                 }
@@ -2705,7 +2713,7 @@
                 fontFamily = fontFamily || 'Arial';
                 if (!formattedText || formattedText.trim() === '') return '';
 
-                const hasFormatting = /\*|~|\^|_|\[SC\]|\[SIZE=/.test(formattedText);
+                const hasFormatting = /\*|~|\^|_|\[SIZE=/.test(formattedText);
 
                 if (!hasFormatting) {
                     return `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" ` +
@@ -3468,6 +3476,7 @@
             // MODE MANAGEMENT METHODS
             // ========================================
             setMode(newMode) {
+                const oldMode = this.mode;
                 this.mode = newMode;
                 
                 // Reset mode-specific state
@@ -3481,8 +3490,8 @@
                     }
                 });
 
-                // Cancel any in-progress box drawing
-                if (this.mode !== newMode) {
+                // Cancel any in-progress box drawing on a real mode change
+                if (oldMode !== newMode) {
                     this._boxDrawing = false;
                     this._boxStart = null;
                     this._boxPreview = null;
@@ -4205,7 +4214,12 @@
                     .map(a => ({
                         fromId: a.from.id, toId: a.to.id, id: a.id,
                         curveDirection: a.curveDirection,
-                        controlPointX: a.controlPointX, controlPointY: a.controlPointY
+                        controlPointX: a.controlPointX, controlPointY: a.controlPointY,
+                        lineStyle: a.lineStyle,
+                        lineShape: a.lineShape,
+                        annotation: a.annotation,
+                        annotationPosition: a.annotationPosition,
+                        annotationOffset: a.annotationOffset
                     }));
 
                 this.clipboard = { nodes, connections, movementArrows };
