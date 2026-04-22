@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>jsSynTree 1.9</title>
+    <title>jsSynTree 2.0</title>
     <style>
         body {
             margin: 0;
@@ -271,6 +271,67 @@
             position: static;
         }
 
+        /* Arrow property panel */
+        #arrowPropertyPanel {
+            display: none;
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 12px 16px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.18);
+            z-index: 200;
+            min-width: 230px;
+            font-size: 13px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+        }
+        #arrowPropertyPanel .ap-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 6px;
+        }
+        #arrowPropertyPanel label {
+            display: block;
+            margin-bottom: 8px;
+            color: #444;
+        }
+        #arrowPropertyPanel select,
+        #arrowPropertyPanel input[type="text"],
+        #arrowPropertyPanel input[type="number"] {
+            margin-top: 3px;
+            width: 100%;
+            padding: 4px 6px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 13px;
+            box-sizing: border-box;
+            background: white;
+            color: #333;
+        }
+        #arrowPropertyPanel input[type="range"] {
+            width: 100%;
+            margin-top: 3px;
+        }
+        #ap-position-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        #ap-position-row input[type="range"] {
+            flex: 1;
+        }
+        #apAnnotationPositionVal {
+            font-size: 11px;
+            color: #666;
+            width: 30px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+
     </style>
 </head>
 <body>    
@@ -323,6 +384,36 @@
             Select &gt; Double-click to edit node text &bull; Select &gt; Drag to move node &bull; Select &gt; Ctrl+click to select node + descendants &bull; Connect &gt; Click on mother then daughter &bull; Add Movement &gt; Click source then destination &bull; Select movement arrow to adjust curvature &bull; Esc = Cancel &bull; Del = Delete &bull; Ctrl+Z = Undo &bull; Ctrl+Y = Redo
         </div>
         
+        <!-- Arrow property panel (contextual, shown when movement arrow is selected) -->
+        <div id="arrowPropertyPanel">
+            <div class="ap-title">&#8594; Arrow Properties</div>
+            <label>Line style
+                <select id="apLineStyle">
+                    <option value="dashed">Dashed</option>
+                    <option value="dotted">Dotted</option>
+                    <option value="solid">Solid</option>
+                </select>
+            </label>
+            <label>Line shape
+                <select id="apLineShape">
+                    <option value="curved">Curved</option>
+                    <option value="angular">Angular</option>
+                </select>
+            </label>
+            <label>Annotation
+                <input id="apAnnotation" type="text" placeholder="e.g. wh-move">
+            </label>
+            <label>Position along curve
+                <div id="ap-position-row">
+                    <input id="apAnnotationPosition" type="range" min="0" max="1" step="0.01" value="0.5">
+                    <span id="apAnnotationPositionVal">0.50</span>
+                </div>
+            </label>
+            <label>Offset (px)
+                <input id="apAnnotationOffset" type="number" min="-150" max="150" step="1" value="15">
+            </label>
+        </div>
+
         <div class="workspace">
             <canvas id="canvas"></canvas>
             <div class="nav-panel" id="navPanel">
@@ -1325,9 +1416,17 @@
                     this.controlPointX = initialPoints.x;
                     this.controlPointY = initialPoints.y;
 
+                    // Session 7: new per-arrow properties
+                    this.lineStyle = 'dashed';      // 'dashed' | 'dotted' | 'solid'
+                    this.lineShape = 'curved';      // 'curved' | 'angular'
+                    this.annotation = '';           // string; empty = no annotation rendered
+                    this.annotationPosition = 0.5;  // 0.0–1.0 along curve
+                    this.annotationOffset = 15;     // px, perpendicular offset
+
                     // Cache for performance
                     this._pointsCache = null;
                     this._pointsHash = null;
+                    this._annotationBounds = null;
                 }
                 
                 _calculateInitialControlPoint(ctx, forCurveDirection = this.curveDirection) {
@@ -1374,13 +1473,118 @@
                     }
                     return this._pointsCache;
                 }
+
+                // Get a point at parameter t along the curve (0=from, 1=to)
+                _getPointAtT(fromPoint, toPoint, controlPoint, t) {
+                    if (this.lineShape === 'angular') {
+                        const leg1 = Math.hypot(controlPoint.x - fromPoint.x, controlPoint.y - fromPoint.y);
+                        const leg2 = Math.hypot(toPoint.x - controlPoint.x, toPoint.y - controlPoint.y);
+                        const total = leg1 + leg2;
+                        if (total === 0) return { x: fromPoint.x, y: fromPoint.y };
+                        const dist = t * total;
+                        if (dist <= leg1) {
+                            const s = leg1 > 0 ? dist / leg1 : 0;
+                            return {
+                                x: fromPoint.x + s * (controlPoint.x - fromPoint.x),
+                                y: fromPoint.y + s * (controlPoint.y - fromPoint.y)
+                            };
+                        } else {
+                            const s = leg2 > 0 ? (dist - leg1) / leg2 : 0;
+                            return {
+                                x: controlPoint.x + s * (toPoint.x - controlPoint.x),
+                                y: controlPoint.y + s * (toPoint.y - controlPoint.y)
+                            };
+                        }
+                    } else {
+                        const mt = 1 - t;
+                        return {
+                            x: mt * mt * fromPoint.x + 2 * mt * t * controlPoint.x + t * t * toPoint.x,
+                            y: mt * mt * fromPoint.y + 2 * mt * t * controlPoint.y + t * t * toPoint.y
+                        };
+                    }
+                }
+
+                // Get tangent direction at parameter t
+                _getTangentAtT(fromPoint, toPoint, controlPoint, t) {
+                    if (this.lineShape === 'angular') {
+                        const leg1 = Math.hypot(controlPoint.x - fromPoint.x, controlPoint.y - fromPoint.y);
+                        const leg2 = Math.hypot(toPoint.x - controlPoint.x, toPoint.y - controlPoint.y);
+                        const total = leg1 + leg2;
+                        if (t * total <= leg1) {
+                            return { x: controlPoint.x - fromPoint.x, y: controlPoint.y - fromPoint.y };
+                        } else {
+                            return { x: toPoint.x - controlPoint.x, y: toPoint.y - controlPoint.y };
+                        }
+                    } else {
+                        const mt = 1 - t;
+                        return {
+                            x: 2 * mt * (controlPoint.x - fromPoint.x) + 2 * t * (toPoint.x - controlPoint.x),
+                            y: 2 * mt * (controlPoint.y - fromPoint.y) + 2 * t * (toPoint.y - controlPoint.y)
+                        };
+                    }
+                }
+
+                drawAnnotation(ctx, isSelected) {
+                    const { fromPoint, toPoint, controlPoint } = this.getPoints(ctx);
+                    const t = this.annotationPosition;
+                    const pt = this._getPointAtT(fromPoint, toPoint, controlPoint, t);
+                    const tan = this._getTangentAtT(fromPoint, toPoint, controlPoint, t);
+
+                    const len = Math.hypot(tan.x, tan.y);
+                    const nx = len > 0 ? tan.x / len : 1;
+                    const ny = len > 0 ? tan.y / len : 0;
+
+                    // Perpendicular: rotate tangent -90°
+                    const px = -ny;
+                    const py = nx;
+
+                    const ax = pt.x + px * this.annotationOffset;
+                    const ay = pt.y + py * this.annotationOffset;
+
+                    ctx.save();
+                    const font = (typeof app !== 'undefined' && app.currentFont) ? app.currentFont : 'Arial';
+                    ctx.font = `12px ${font}`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+
+                    const tw = ctx.measureText(this.annotation).width;
+                    const th = 14;
+                    const pad = 3;
+
+                    // Background for legibility
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+                    const bx = ax - tw / 2 - pad;
+                    const by = ay - th / 2 - pad;
+                    const bw = tw + pad * 2;
+                    const bh = th + pad * 2;
+                    if (typeof ctx.roundRect === 'function') {
+                        ctx.beginPath();
+                        ctx.roundRect(bx, by, bw, bh, 3);
+                        ctx.fill();
+                    } else {
+                        ctx.fillRect(bx, by, bw, bh);
+                    }
+
+                    ctx.fillStyle = isSelected ? 'rgba(255, 100, 0, 0.9)' : '#333';
+                    ctx.fillText(this.annotation, ax, ay);
+                    ctx.restore();
+
+                    // Store hit bounds for drag detection
+                    const hitPad = 6;
+                    this._annotationBounds = {
+                        x: bx - hitPad, y: by - hitPad,
+                        w: bw + hitPad * 2, h: bh + hitPad * 2,
+                        ax, ay
+                    };
+                }
+
+                getAnnotationHitBounds() {
+                    if (!this.annotation || this.annotation.trim() === '') return null;
+                    return this._annotationBounds || null;
+                }
                 
                 draw(ctx, isSelected) {
                     const { fromPoint, toPoint, controlPoint } = this.getPoints(ctx);
-
-                    ctx.beginPath();
-                    ctx.moveTo(fromPoint.x, fromPoint.y);
-                    ctx.quadraticCurveTo(controlPoint.x, controlPoint.y, toPoint.x, toPoint.y);
 
                     if (isSelected) {
                         ctx.strokeStyle = 'rgba(255, 100, 0, 0.9)';
@@ -1391,12 +1595,28 @@
                         ctx.strokeStyle = 'rgba(50, 50, 200, 0.8)';
                         ctx.lineWidth = 1.5;
                     }
-                    
-                    ctx.setLineDash([5, 5]);
+
+                    // Line dash
+                    switch (this.lineStyle) {
+                        case 'solid':  ctx.setLineDash([]); break;
+                        case 'dotted': ctx.setLineDash([2, 4]); break;
+                        case 'dashed':
+                        default:       ctx.setLineDash([5, 5]); break;
+                    }
+
+                    // Line shape
+                    ctx.beginPath();
+                    ctx.moveTo(fromPoint.x, fromPoint.y);
+                    if (this.lineShape === 'angular') {
+                        ctx.lineTo(controlPoint.x, controlPoint.y);
+                        ctx.lineTo(toPoint.x, toPoint.y);
+                    } else {
+                        ctx.quadraticCurveTo(controlPoint.x, controlPoint.y, toPoint.x, toPoint.y);
+                    }
                     ctx.stroke();
                     ctx.setLineDash([]);
 
-                    // Draw arrowhead
+                    // Arrowhead — angle from control point to toPoint (correct for both shapes)
                     const angle = Math.atan2(toPoint.y - controlPoint.y, toPoint.x - controlPoint.x);
 
                     ctx.beginPath();
@@ -1420,21 +1640,34 @@
                         ctx.strokeStyle = 'rgba(0, 80, 180, 1)';
                         ctx.lineWidth = 1;
                         ctx.stroke();
+                    } else {
+                        ctx.shadowBlur = 0;
+                        ctx.shadowColor = 'transparent';
+                    }
+
+                    // Annotation
+                    if (this.annotation && this.annotation.trim() !== '') {
+                        this.drawAnnotation(ctx, isSelected);
+                    } else {
+                        this._annotationBounds = null;
                     }
                 }
                 
                 distanceToPoint(x, y, ctx) {
                     const { fromPoint, toPoint, controlPoint } = this.getPoints(ctx);
+
+                    if (this.lineShape === 'angular') {
+                        const d1 = Utils.distanceToLineSegment(x, y, fromPoint.x, fromPoint.y, controlPoint.x, controlPoint.y);
+                        const d2 = Utils.distanceToLineSegment(x, y, controlPoint.x, controlPoint.y, toPoint.x, toPoint.y);
+                        return Math.min(d1, d2);
+                    }
+
                     const numSegments = 20;
                     let minDistance = Infinity;
-
                     for (let i = 0; i <= numSegments; i++) {
                         const t = i / numSegments;
-                        const curveX = Math.pow(1 - t, 2) * fromPoint.x + 2 * (1 - t) * t * controlPoint.x + Math.pow(t, 2) * toPoint.x;
-                        const curveY = Math.pow(1 - t, 2) * fromPoint.y + 2 * (1 - t) * t * controlPoint.y + Math.pow(t, 2) * toPoint.y;
-
-                        const distance = Math.sqrt(Math.pow(x - curveX, 2) + Math.pow(y - curveY, 2));
-                        minDistance = Math.min(minDistance, distance);
+                        const pt = this._getPointAtT(fromPoint, toPoint, controlPoint, t);
+                        minDistance = Math.min(minDistance, Math.hypot(x - pt.x, y - pt.y));
                     }
                     return minDistance;
                 }
@@ -2231,14 +2464,73 @@
                         + `stroke="#333" stroke-width="1.5"/>`);
                 });
 
-                // --- Movement arrows (dashed bezier) ---
+                // --- Movement arrows ---
                 movementArrows.forEach(arrow => {
                     const fp = arrow.from.getEdgeIntersectionPoint(arrow.controlPointX, arrow.controlPointY, ctx);
                     const tp = arrow.to.getEdgeIntersectionPoint(arrow.controlPointX, arrow.controlPointY, ctx);
                     const cpx = arrow.controlPointX, cpy = arrow.controlPointY;
-                    out.push(`<path d="M${fp.x},${fp.y} Q${cpx},${cpy} ${tp.x},${tp.y}" `
-                        + `fill="none" stroke="#555" stroke-width="1.5" `
-                        + `stroke-dasharray="5,3" marker-end="url(#mvarrow)"/>`);
+
+                    // Line dash
+                    const dashArray = (arrow.lineStyle === 'solid') ? 'none'
+                                    : (arrow.lineStyle === 'dotted') ? '2,4'
+                                    : '5,3';
+
+                    // Path shape
+                    const pathD = (arrow.lineShape === 'angular')
+                        ? `M${fp.x},${fp.y} L${cpx},${cpy} L${tp.x},${tp.y}`
+                        : `M${fp.x},${fp.y} Q${cpx},${cpy} ${tp.x},${tp.y}`;
+
+                    out.push(`<path d="${pathD}" fill="none" stroke="#555" stroke-width="1.5" `
+                        + `stroke-dasharray="${dashArray}" marker-end="url(#mvarrow)"/>`);
+
+                    // Annotation text
+                    if (arrow.annotation && arrow.annotation.trim() !== '') {
+                        const t = arrow.annotationPosition != null ? arrow.annotationPosition : 0.5;
+                        const offset = arrow.annotationOffset != null ? arrow.annotationOffset : 15;
+                        let ax, ay;
+
+                        if (arrow.lineShape === 'angular') {
+                            const leg1 = Math.hypot(cpx - fp.x, cpy - fp.y);
+                            const leg2 = Math.hypot(tp.x - cpx, tp.y - cpy);
+                            const total = leg1 + leg2;
+                            const dist = t * total;
+                            let ptx, pty, tanX, tanY;
+                            if (dist <= leg1) {
+                                const s = leg1 > 0 ? dist / leg1 : 0;
+                                ptx = fp.x + s * (cpx - fp.x); pty = fp.y + s * (cpy - fp.y);
+                                tanX = cpx - fp.x; tanY = cpy - fp.y;
+                            } else {
+                                const s = leg2 > 0 ? (dist - leg1) / leg2 : 0;
+                                ptx = cpx + s * (tp.x - cpx); pty = cpy + s * (tp.y - cpy);
+                                tanX = tp.x - cpx; tanY = tp.y - cpy;
+                            }
+                            const tlen = Math.hypot(tanX, tanY);
+                            const pxn = tlen > 0 ? -tanY / tlen : 0;
+                            const pyn = tlen > 0 ?  tanX / tlen : 1;
+                            ax = ptx + pxn * offset;
+                            ay = pty + pyn * offset;
+                        } else {
+                            const mt = 1 - t;
+                            const ptx = mt*mt*fp.x + 2*mt*t*cpx + t*t*tp.x;
+                            const pty = mt*mt*fp.y + 2*mt*t*cpy + t*t*tp.y;
+                            const tanX = 2*mt*(cpx - fp.x) + 2*t*(tp.x - cpx);
+                            const tanY = 2*mt*(cpy - fp.y) + 2*t*(tp.y - cpy);
+                            const tlen = Math.hypot(tanX, tanY);
+                            const pxn = tlen > 0 ? -tanY / tlen : 0;
+                            const pyn = tlen > 0 ?  tanX / tlen : 1;
+                            ax = ptx + pxn * offset;
+                            ay = pty + pyn * offset;
+                        }
+
+                        const escAnn = arrow.annotation
+                            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                        const svgFont = (typeof app !== 'undefined' && app.currentFont) ? app.currentFont : 'Arial';
+                        out.push(`<text x="${ax.toFixed(1)}" y="${ay.toFixed(1)}" `
+                            + `font-family="${svgFont}" font-size="12" `
+                            + `text-anchor="middle" dominant-baseline="middle" fill="#333">`
+                            + escAnn + `</text>`);
+                    }
                 });
 
                 // --- Nodes ---
@@ -2450,6 +2742,7 @@
                 // Interaction state
                 this.isDragging = false;
                 this.draggingControlPointArrow = null;
+                this.draggingAnnotation = null;
                 this.dragOffset = { x: 0, y: 0 };
                 this._dragRedrawPending = false;
 
@@ -2494,6 +2787,9 @@
                     // Resize canvas to fill available space
                     setTimeout(() => this.resizeCanvas(), 250);
                 });
+
+                // Arrow property panel inputs
+                this._initArrowPanel();
 
                 this.redraw();
             }
@@ -2638,6 +2934,7 @@
                 this.selectedConnection = null;
                 this.selectedMovementArrow = null;
                 this.dominanceSelectedNodes.clear();
+                this.updateArrowPanel();
             }
             
             hasDominanceSelection() {
@@ -2647,7 +2944,7 @@
             // STATE MANAGEMENT METHODS            
             getCurrentStateObject() {
                 return {
-                    version: '1.9',
+                    version: '2.0',
                     nodes: this.nodes.map(node => ({
                         x: node.x,
                         y: node.y,
@@ -2667,7 +2964,12 @@
                         id: arrow.id,
                         curveDirection: arrow.curveDirection,
                         controlPointX: arrow.controlPointX,
-                        controlPointY: arrow.controlPointY
+                        controlPointY: arrow.controlPointY,
+                        lineStyle: arrow.lineStyle,
+                        lineShape: arrow.lineShape,
+                        annotation: arrow.annotation,
+                        annotationPosition: arrow.annotationPosition,
+                        annotationOffset: arrow.annotationOffset
                     })),
                     settings: {
                         showGrid: this.showGrid,
@@ -2740,6 +3042,8 @@
                 this.connectingFrom = null;
                 this.connectingMovementFrom = null;
                 this.draggingControlPointArrow = null;
+                this.draggingAnnotation = null;
+                this.updateArrowPanel();
                 
                 this.redraw();
             }
@@ -3012,6 +3316,7 @@
                             c.distanceToPoint(x, y, this.ctx) < CONFIG.SELECTION_THRESHOLD) || null;
                     }
                 }
+                this.updateArrowPanel();
             }
 
             handleCanvasDoubleClick(e) {
@@ -3028,8 +3333,24 @@
                 if (this.mode !== 'select') return;
                 
                 const { x, y } = this.getCanvasCoordinates(e);
+
+                // Check for annotation drag (takes priority over control-point drag)
+                for (const arrow of this.movementArrows) {
+                    const bounds = arrow.getAnnotationHitBounds();
+                    if (bounds && x >= bounds.x && x <= bounds.x + bounds.w
+                               && y >= bounds.y && y <= bounds.y + bounds.h) {
+                        this.draggingAnnotation = { arrow };
+                        this.selectedMovementArrow = arrow;
+                        this.selectedNode = null;
+                        this.selectedConnection = null;
+                        this.dominanceSelectedNodes.clear();
+                        this.updateArrowPanel();
+                        this.redraw();
+                        return;
+                    }
+                }
                 
-                // Check for control point drag first
+                // Check for control point drag
                 if (this.selectedMovementArrow && this.selectedMovementArrow.isControlPointHit(x, y)) {
                     this.draggingControlPointArrow = this.selectedMovementArrow;
                     this.isDragging = false;
@@ -3048,6 +3369,7 @@
                     this.selectedConnection = null;
                     this.selectedMovementArrow = null;
                     this.canvas.style.cursor = 'grabbing';
+                    this.updateArrowPanel();
                 } else {
                     // Check for connection or movement arrow selection
                     this.selectedConnection = this.connections.find(c => 
@@ -3057,6 +3379,7 @@
                         this.selectedMovementArrow = this.movementArrows.find(a => 
                             a.distanceToPoint(x, y, this.ctx) < CONFIG.MOVEMENT_SELECTION_THRESHOLD) || null;
                     }
+                    this.updateArrowPanel();
                 }
                 
                 this.redraw();
@@ -3087,6 +3410,45 @@
                     }
                     
                     // Throttle redraws during dragging
+                    if (!this._dragRedrawPending) {
+                        this._dragRedrawPending = true;
+                        requestAnimationFrame(() => {
+                            this.redraw();
+                            this._dragRedrawPending = false;
+                        });
+                    }
+                } else if (this.draggingAnnotation) {
+                    const { arrow } = this.draggingAnnotation;
+                    const { fromPoint, toPoint, controlPoint } = arrow.getPoints(this.ctx);
+
+                    // Find nearest t on curve to mouse
+                    let bestT = arrow.annotationPosition;
+                    let bestDist = Infinity;
+                    const samples = 100;
+                    for (let i = 0; i <= samples; i++) {
+                        const t = i / samples;
+                        const pt = arrow._getPointAtT(fromPoint, toPoint, controlPoint, t);
+                        const d = Math.hypot(x - pt.x, y - pt.y);
+                        if (d < bestDist) { bestDist = d; bestT = t; }
+                    }
+                    arrow.annotationPosition = bestT;
+
+                    // Compute perpendicular offset from curve point to mouse
+                    const curvePt = arrow._getPointAtT(fromPoint, toPoint, controlPoint, bestT);
+                    const tan = arrow._getTangentAtT(fromPoint, toPoint, controlPoint, bestT);
+                    const tlen = Math.hypot(tan.x, tan.y);
+                    const pxn = tlen > 0 ? -tan.y / tlen : 0;
+                    const pyn = tlen > 0 ?  tan.x / tlen : 1;
+                    arrow.annotationOffset = (x - curvePt.x) * pxn + (y - curvePt.y) * pyn;
+
+                    // Sync panel
+                    const posEl = document.getElementById('apAnnotationPosition');
+                    const valEl = document.getElementById('apAnnotationPositionVal');
+                    const offEl = document.getElementById('apAnnotationOffset');
+                    if (posEl) posEl.value = bestT;
+                    if (valEl) valEl.textContent = bestT.toFixed(2);
+                    if (offEl) offEl.value = Math.round(arrow.annotationOffset);
+
                     if (!this._dragRedrawPending) {
                         this._dragRedrawPending = true;
                         requestAnimationFrame(() => {
@@ -3127,6 +3489,10 @@
             }
 
             handleCanvasMouseUp() {
+                if (this.draggingAnnotation) {
+                    this.draggingAnnotation = null;
+                    this.saveState();
+                }
                 if (this.isDragging && this.selectedNode) {
                     this.saveState();
                 }
@@ -3318,8 +3684,13 @@
                             fromNode, toNode, aData.curveDirection || 1, this.ctx
                         );
                         Object.assign(arrow, {
-                            controlPointX: aData.controlPointX ? aData.controlPointX + offset : undefined,
-                            controlPointY: aData.controlPointY ? aData.controlPointY + offset : undefined
+                            controlPointX: aData.controlPointX !== undefined ? aData.controlPointX + offset : arrow.controlPointX,
+                            controlPointY: aData.controlPointY !== undefined ? aData.controlPointY + offset : arrow.controlPointY,
+                            lineStyle: aData.lineStyle || 'dashed',
+                            lineShape: aData.lineShape || 'curved',
+                            annotation: aData.annotation || '',
+                            annotationPosition: aData.annotationPosition != null ? aData.annotationPosition : 0.5,
+                            annotationOffset: aData.annotationOffset != null ? aData.annotationOffset : 15
                         });
                         return arrow;
                     }).filter(a => a !== null);
@@ -3728,6 +4099,66 @@
                 reader.readAsText(file);
             }
             
+            // ========================================
+            // ARROW PROPERTY PANEL
+            // ========================================
+            updateArrowPanel() {
+                const panel = document.getElementById('arrowPropertyPanel');
+                if (!panel) return;
+                const arrow = this.selectedMovementArrow;
+                if (!arrow) {
+                    panel.style.display = 'none';
+                    return;
+                }
+                panel.style.display = 'block';
+                document.getElementById('apLineStyle').value = arrow.lineStyle || 'dashed';
+                document.getElementById('apLineShape').value = arrow.lineShape || 'curved';
+                document.getElementById('apAnnotation').value = arrow.annotation || '';
+                const pos = arrow.annotationPosition != null ? arrow.annotationPosition : 0.5;
+                document.getElementById('apAnnotationPosition').value = pos;
+                document.getElementById('apAnnotationPositionVal').textContent = pos.toFixed(2);
+                document.getElementById('apAnnotationOffset').value = arrow.annotationOffset != null ? arrow.annotationOffset : 15;
+            }
+
+            _initArrowPanel() {
+                document.getElementById('apLineStyle').addEventListener('change', e => {
+                    if (!this.selectedMovementArrow) return;
+                    this.selectedMovementArrow.lineStyle = e.target.value;
+                    this.saveState(); this.redraw();
+                });
+                document.getElementById('apLineShape').addEventListener('change', e => {
+                    if (!this.selectedMovementArrow) return;
+                    this.selectedMovementArrow.lineShape = e.target.value;
+                    this.saveState(); this.redraw();
+                });
+                document.getElementById('apAnnotation').addEventListener('input', e => {
+                    if (!this.selectedMovementArrow) return;
+                    this.selectedMovementArrow.annotation = e.target.value;
+                    this.redraw();
+                });
+                document.getElementById('apAnnotation').addEventListener('blur', () => {
+                    if (this.selectedMovementArrow) this.saveState();
+                });
+                document.getElementById('apAnnotationPosition').addEventListener('input', e => {
+                    if (!this.selectedMovementArrow) return;
+                    const v = parseFloat(e.target.value);
+                    this.selectedMovementArrow.annotationPosition = v;
+                    document.getElementById('apAnnotationPositionVal').textContent = v.toFixed(2);
+                    this.redraw();
+                });
+                document.getElementById('apAnnotationPosition').addEventListener('change', () => {
+                    if (this.selectedMovementArrow) this.saveState();
+                });
+                document.getElementById('apAnnotationOffset').addEventListener('input', e => {
+                    if (!this.selectedMovementArrow) return;
+                    this.selectedMovementArrow.annotationOffset = parseFloat(e.target.value) || 0;
+                    this.redraw();
+                });
+                document.getElementById('apAnnotationOffset').addEventListener('change', () => {
+                    if (this.selectedMovementArrow) this.saveState();
+                });
+            }
+
             // MODAL MANAGEMENT METHODS
             openPropertiesModal() {
                 if (!this.editingNode) return;
