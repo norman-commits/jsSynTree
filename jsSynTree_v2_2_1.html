@@ -204,8 +204,7 @@
             position: relative;
         }
         .workspace canvas {
-            flex: 1;
-            min-width: 0;
+            flex-shrink: 0;
             display: block;
         }
         .nav-panel {
@@ -3212,14 +3211,15 @@
             }
 
             resizeCanvas() {
-                // Set canvas internal resolution to match our desired size
-                this.canvas.width = this.canvasWidth;
-                this.canvas.height = this.canvasHeight;
-                
-                // Set CSS size to match internal resolution (prevents scaling)
-                this.canvas.style.width = this.canvasWidth + 'px';
+                const dpr = window.devicePixelRatio || 1;
+                // Physical pixel buffer — scaled up for HiDPI / Retina displays
+                this.canvas.width  = Math.round(this.canvasWidth  * dpr);
+                this.canvas.height = Math.round(this.canvasHeight * dpr);
+                // CSS display size stays at logical pixels
+                this.canvas.style.width  = this.canvasWidth  + 'px';
                 this.canvas.style.height = this.canvasHeight + 'px';
-                
+                // Scale the drawing context so all coordinates remain in logical pixels
+                this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
                 this.redraw();
             }
 
@@ -4416,23 +4416,23 @@
                 this.ctx.strokeStyle = '#e0e0e0';
                 this.ctx.lineWidth = 0.5;
                 
-                for (let x = 0; x <= this.canvas.width; x += CONFIG.GRID_SIZE) {
+                for (let x = 0; x <= this.canvasWidth; x += CONFIG.GRID_SIZE) {
                     this.ctx.beginPath();
                     this.ctx.moveTo(x, 0);
-                    this.ctx.lineTo(x, this.canvas.height);
+                    this.ctx.lineTo(x, this.canvasHeight);
                     this.ctx.stroke();
                 }
                 
-                for (let y = 0; y <= this.canvas.height; y += CONFIG.GRID_SIZE) {
+                for (let y = 0; y <= this.canvasHeight; y += CONFIG.GRID_SIZE) {
                     this.ctx.beginPath();
                     this.ctx.moveTo(0, y);
-                    this.ctx.lineTo(this.canvas.width, y);
+                    this.ctx.lineTo(this.canvasWidth, y);
                     this.ctx.stroke();
                 }
             }
 
             redraw() {
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
                 this.drawGrid();
 
                 // Draw decorations first (bottom layer)
@@ -4495,7 +4495,7 @@
 
                 // White background for export
                 this.ctx.fillStyle = 'white';
-                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
 
                 // Draw decorations first
                 this.decorations.forEach(dec => {
