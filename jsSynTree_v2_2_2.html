@@ -4153,6 +4153,22 @@
                     return;
                 }
 
+                // If focus is inside a non-modal input/select/textarea (e.g. the arrow or
+                // decoration property panels), let native editing behaviour run uninterrupted.
+                // Without this guard, pressing Delete while typing an annotation text fires
+                // deleteSelected() and silently removes the selected movement arrow.
+                const activeEl = document.activeElement;
+                const EDITABLE = ['INPUT', 'SELECT', 'TEXTAREA'];
+                if (activeEl && EDITABLE.includes(activeEl.tagName) && !activeEl.closest('.modal')) {
+                    // Allow Escape to blur the field and deselect, but nothing else.
+                    if (e.key === 'Escape') {
+                        activeEl.blur();
+                        this.handleEscape();
+                        e.preventDefault();
+                    }
+                    return;
+                }
+
                 const action = shortcutManager.match(e);
                 if (!action) return;
 
