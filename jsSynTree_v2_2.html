@@ -479,6 +479,15 @@
                     <option value="angular">Angular</option>
                 </select>
             </label>
+            <label>Movement type
+                <select id="apMovementType">
+                    <option value="">— unspecified —</option>
+                    <option value="A">A</option>
+                    <option value="A-bar">A-bar</option>
+                    <option value="Head">Head</option>
+                    <option value="Other">Other</option>
+                </select>
+            </label>
             <label>Annotation
                 <input id="apAnnotation" type="text" placeholder="e.g. wh-move">
             </label>
@@ -1751,6 +1760,9 @@
                     this.annotation = '';           // string; empty = no annotation rendered
                     this.annotationPosition = 0.5;  // 0.0–1.0 along curve
                     this.annotationOffset = 15;     // px, perpendicular offset
+
+                    // v2.2: semantic classification (machine-readable; no visual effect)
+                    this.movementType = '';         // '' | 'A' | 'A-bar' | 'Head' | 'Other'
 
                     // Cache for performance
                     this._pointsCache = null;
@@ -3335,7 +3347,7 @@
             // STATE MANAGEMENT METHODS            
             getCurrentStateObject() {
                 return {
-                    version: '2.1',
+                    version: '2.2',
                     nodes: this.nodes.map(node => ({
                         x: node.x,
                         y: node.y,
@@ -3360,7 +3372,8 @@
                         lineShape: arrow.lineShape,
                         annotation: arrow.annotation,
                         annotationPosition: arrow.annotationPosition,
-                        annotationOffset: arrow.annotationOffset
+                        annotationOffset: arrow.annotationOffset,
+                        movementType: arrow.movementType || ''
                     })),
                     decorations: this.decorations.map(dec => Object.assign({}, dec)),
                     settings: {
@@ -4285,7 +4298,8 @@
                             lineShape: aData.lineShape || 'curved',
                             annotation: aData.annotation || '',
                             annotationPosition: aData.annotationPosition != null ? aData.annotationPosition : 0.5,
-                            annotationOffset: aData.annotationOffset != null ? aData.annotationOffset : 15
+                            annotationOffset: aData.annotationOffset != null ? aData.annotationOffset : 15,
+                            movementType: aData.movementType || ''
                         });
                         return arrow;
                     }).filter(a => a !== null);
@@ -4736,6 +4750,7 @@
                 panel.style.display = 'block';
                 document.getElementById('apLineStyle').value = arrow.lineStyle || 'dashed';
                 document.getElementById('apLineShape').value = arrow.lineShape || 'curved';
+                document.getElementById('apMovementType').value = arrow.movementType || '';
                 document.getElementById('apAnnotation').value = arrow.annotation || '';
                 const pos = arrow.annotationPosition != null ? arrow.annotationPosition : 0.5;
                 document.getElementById('apAnnotationPosition').value = pos;
@@ -4753,6 +4768,12 @@
                     if (!this.selectedMovementArrow) return;
                     this.selectedMovementArrow.lineShape = e.target.value;
                     this.saveState(); this.redraw();
+                });
+                document.getElementById('apMovementType').addEventListener('change', e => {
+                    if (!this.selectedMovementArrow) return;
+                    this.selectedMovementArrow.movementType = e.target.value;
+                    this.saveState();
+                    // No redraw: movementType has no visual effect in v2.2.
                 });
                 document.getElementById('apAnnotation').addEventListener('input', e => {
                     if (!this.selectedMovementArrow) return;
