@@ -1,1 +1,7 @@
-\old versions
+/old versions
+
+.claude/
+
+# OS noise
+Thumbs.db
+.DS_Store

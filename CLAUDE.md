@@ -145,19 +145,39 @@ See design doc **Session 8** for full specification.
 
 ---
 
+### ✅ Session 9 — v2.2.x Bug Fixes & Semantic Classification → `jsSynTree_v2_2_2.html`
+
+**v2.2 — Semantic export**
+
+- [x] Add `movementType` field to `MovementArrow`: `'' | 'A' | 'A-bar' | 'Head' | 'Other'`
+- [x] Add dropdown selector in arrow property panel for movement type
+- [x] Persist `movementType` in save/load and undo/redo
+- [x] Machine-readable data with no visual effect (for export processing)
+
+**v2.2.1 — Canvas fix**
+
+- [x] Fix canvas-related bug (details in commit)
+
+**v2.2.2 — Arrow modal fix**
+
+- [x] Fix arrow property panel UI issues
+
+---
+
 ## File Index
 
-| File                        | Version | Status                                |
-| --------------------------- | ------- | ------------------------------------- |
-| `jsSynTree_v1_3.html`       | v1.3    | Previous working base                 |
-| `jsSynTree_v1_4.html`       | v1.4    | Session 1 output                      |
-| `jsSynTree_v1_5.html`       | v1.5    | Session 2 output                      |
-| `jsSynTree_v1_6.html`       | v1.6    | Session 3 output                      |
-| `jsSynTree_v1_7.html`       | v1.7    | Session 4 output                      |
-| `jsSynTree_v1_8.html`       | v1.8    | Session 5 output                      |
-| `jsSynTree_v1_9.html`       | v1.9    | Session 6 output                      |
-| `jsSynTree_v2_0.html`       | v2.0    | Session 7 output                      |
-| `jsSynTree_v2_1.html`       | v2.1    | Session 8 output                      |
-| `jsSynTree_v2_design.md`    | —       | Full feature specification            |
-| `jsSynTree_bracket_spec.md` | —       | Bracket notation format specification |
-| `CLAUDE.md`                 | —       | This file                             |
+| File                        | Version  | Status                                |
+| --------------------------- | -------- | ------------------------------------- |
+| `jsSynTree_v1_3.html`       | v1.3     | Previous working base                 |
+| `jsSynTree_v1_4.html`       | v1.4     | Session 1 output                      |
+| `jsSynTree_v1_5.html`       | v1.5     | Session 2 output                      |
+| `jsSynTree_v1_6.html`       | v1.6     | Session 3 output                      |
+| `jsSynTree_v1_7.html`       | v1.7     | Session 4 output                      |
+| `jsSynTree_v1_8.html`       | v1.8     | Session 5 output                      |
+| `jsSynTree_v1_9.html`       | v1.9     | Session 6 output                      |
+| `jsSynTree_v2_0.html`       | v2.0     | Session 7 output                      |
+| `jsSynTree_v2_1.html`       | v2.1     | Session 8 output                      |
+| `jsSynTree_v2_2_2.html`     | v2.2.2   | Session 9 output (current)            |
+| `jsSynTree_v2_design.md`    | —        | Full feature specification            |
+| `jsSynTree_bracket_spec.md` | —        | Bracket notation format specification |
+| `CLAUDE.md`                 | —        | This file                             |
