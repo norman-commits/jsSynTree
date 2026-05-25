@@ -188,7 +188,7 @@ Tree files are JSON with a `version` field (currently `"2.2.2"`). The shape:
 }
 ```
 
-Files saved in v1.3 still load — missing fields fall back to safe defaults.
+Files saved in older version may load with missing fields falling back to safe defaults.
 
 ---
 
